@@ -17,7 +17,7 @@ Este projeto realiza webscraping dos dados de médicos diretamente do site do Co
 
 1. Clone o repositório:
     ```bash
-    git clone https://github.com/seu-usuario/webscraping-cfm-luiza.git
+    git clone git@github.com:leovnoliveira/webscraping-cfm-luiza.git
     cd webscraping-cfm-luiza
     ```
 
