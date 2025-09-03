@@ -1,6 +1,23 @@
 version = 1
-revision = 2
+revision = 1
 requires-python = ">=3.11"
+
+[manifest]
+members = [
+    "github",
+    "web-scraping-cfm",
+    "webscraping-cfm-luiza",
+]
+
+[[package]]
+name = "github"
+version = "0.1.0"
+source = { virtual = "github" }
+
+[[package]]
+name = "web-scraping-cfm"
+version = "0.1.0"
+source = { virtual = "github/Web-Scraping-CFM" }
 
 [[package]]
 name = "webscraping-cfm-luiza"

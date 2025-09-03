@@ -16,3 +16,6 @@ wheels/
 *.html
 *.pkl
 *.log
+
+# zip armazenando o repositório
+webscraping-cfm-luiza_20250811.zip

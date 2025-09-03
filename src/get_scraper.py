@@ -4,6 +4,7 @@ from time import sleep
 import logging
 import pickle
 import os
+import re
 from datetime import datetime
 from pathlib import Path
 
@@ -55,16 +56,77 @@ def salvar_csv_periodicamente(dados, uf, sufixo=""):
     
 
 def extrair_campos_card(card):
-    # Nome
+     # normaliza texto (remove NBSP, trims e colapsa espaços/linhas)
+    def norm(s):
+        if not s:
+            return None
+        s = s.replace("\xa0", " ").strip()
+        s = re.sub(r"\s+", " ", s)  # múltiplos espaços viram um só
+        return s if s else None
+
+    # Nome (título do card)
     nome = card.locator("h4").inner_text().strip()
     campos = {"Nome": nome}
-    # Todos os <b> (campos em negrito)
+
     bolds = card.locator("b")
-    for i in range(bolds.count()):
-        campo = bolds.nth(i).inner_text().strip(": ")
-        # Valor é o texto imediatamente depois do <b>
-        valor = bolds.nth(i).evaluate('el => el.nextSibling && el.nextSibling.textContent ? el.nextSibling.textContent.trim() : ""')
-        campos[campo] = valor
+    n_bolds = bolds.count()
+    for i in range(n_bolds):
+        b = bolds.nth(i)
+        label_raw = b.inner_text().strip()
+        label_key = label_raw.rstrip(":")  # chave sem os dois-pontos
+
+        val = None
+
+        # (1) irmão direto <span> ou <a>
+        sib_span = b.locator("xpath=following-sibling::*[self::span or self::a][1]")
+        if sib_span.count():
+            txt = norm(sib_span.inner_text())
+            if txt:
+                val = txt
+
+        # 2) quando há texto “solto” logo após o <b>LABEL:</b>
+        if not val:
+            sib_text = b.locator('xpath=following-sibling::text()[1]')
+            if sib_text.count():
+                txt = norm(sib_text.evaluate("n => n.textContent"))
+                if txt:
+                    val = txt
+        # (3) MESMA LINHA, PRÓXIMA COLUNA
+        # label está numa col do grid; o valor costuma estar na col seguinte
+        if not val:
+            next_col = b.locator(
+                'xpath=ancestor::div[contains(@class,"col-")][1]'
+                '/following-sibling::div[contains(@class,"col-")][1]'
+            )
+            if next_col.count():
+                raw = next_col.inner_text()
+                parts = [norm(x) for x in raw.splitlines()]
+                parts = [x for x in parts if x]
+                if parts:
+                    val = " | ".join(parts) if parts else None
+
+        # (4) ESPECIALIDADES – valor vem no PRÓXIMO .row (não como irmão direto do .row atual)
+        if (not val) and label_key.startswith("Especialidades/Áreas de Atuação"):
+            prox_div = b.locator(
+                'xpath=ancestor::div[contains(@class,"row")][1]'
+                '/following-sibling::div[contains(@class,"row")][1]'
+                '//div[contains(@class,"col-md-12")][1]'
+            )
+            if prox_div.count():
+                raw = prox_div.inner_text()
+                # junta múltiplas linhas (várias especialidades) em uma string única
+                parts = [norm(x) for x in raw.splitlines()]
+                parts = [x for x in parts if x]
+                val = " | ".join(parts) if parts else None
+
+        campos[label_key] = val if val else None
+    
+    # alias amigável (deixa uma coluna direta "especialidade")
+    for k in list(campos.keys()):
+        if "Especialidades/Áreas de Atuação" in k:
+            campos["especialidade"] = campos[k]
+            break
+
     return campos
 
 def scrap_cfm_uf(uf, max_paginas=None, checkpoint_cada=10, csv_cada=100):
@@ -153,4 +215,4 @@ if __name__ == "__main__":
     'PA', 'PB', 'PE', 'PR', 'RJ', 'RS', 'SC', 'SP'
     ]
     
-    scrap_cfm_uf("CE") # Troque a UF aqui
+    scrap_cfm_uf("PR") # Troque a UF aqui
